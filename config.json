@@ -1,0 +1,13 @@
+{
+  "appName": "수능만만 듣기 스크립트 추출기 2",
+  "version": "7.5",
+  "deploy": {
+    "baseUrl": "",
+    "githubPages": true,
+    "description": "GitHub Pages 루트 배포 시 baseUrl은 비워두고, 서브경로(예: /english-listening-extract/) 배포 시 해당 경로를 넣으세요."
+  },
+  "defaults": {
+    "fontSize": 15,
+    "fontFamily": "NanumSquareNeo"
+  }
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>PDF 4페이지만 텍스트 추출</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { font-size: 1.1rem; }
+    input[type="file"] { margin: 10px 0; }
+    pre { background: #f5f5f5; padding: 12px; overflow: auto; max-height: 70vh; white-space: pre-wrap; }
+    button { margin-top: 8px; padding: 6px 12px; }
+  </style>
+</head>
+<body>
+  <h1>PDF 처음 4페이지만 텍스트 추출</h1>
+  <p>파일 선택 후 아래 영역에 4페이지 분량 텍스트가 나옵니다. 복사해서 사용하세요.</p>
+  <input type="file" id="file" accept=".pdf">
+  <button type="button" id="copy">전체 복사</button>
+  <pre id="out"></pre>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    const SPACE_GAP_THRESHOLD = 18;
+    const MAX_PAGES = 4;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    function getPageTextItems(content) {
+      const items = content.items.map(function (item) {
+        const y = item.transform[5];
+        const x = item.transform[4];
+        const w = (item.width != null && item.width > 0) ? item.width : 0;
+        return { str: item.str, y: y, x: x, width: w };
+      });
+      items.sort(function (a, b) {
+        const lineA = Math.round(a.y / 4);
+        const lineB = Math.round(b.y / 4);
+        if (lineA !== lineB) return lineB - lineA;
+        return a.x - b.x;
+      });
+      return items;
+    }
+    function joinLineWithSpacing(lineItems) {
+      if (!lineItems.length) return '';
+      lineItems.sort(function (a, b) { return a.x - b.x; });
+      let out = lineItems[0].str || '';
+      for (let k = 1; k < lineItems.length; k++) {
+        const prevEnd = (lineItems[k - 1].x || 0) + (lineItems[k - 1].width || 0);
+        const gap = (lineItems[k].x || 0) - prevEnd;
+        out += (gap >= SPACE_GAP_THRESHOLD ? '  ' : ' ') + (lineItems[k].str || '');
+      }
+      return out.trim();
+    }
+    function itemsToLines(items, centerX) {
+      function groupItemsIntoLines(sortedItems) {
+        const out = [];
+        let lastY = null;
+        let line = [];
+        for (let i = 0; i < sortedItems.length; i++) {
+          const item = sortedItems[i];
+          const y = Math.round(item.y / 3);
+          if (lastY !== null && Math.abs(y - lastY) > 2) {
+            out.push(joinLineWithSpacing(line));
+            line = [];
+          }
+          line.push(item);
+          lastY = y;
+        }
+        if (line.length) out.push(joinLineWithSpacing(line));
+        return out.filter(Boolean);
+      }
+      if (centerX == null || centerX === undefined) {
+        return groupItemsIntoLines(items);
+      }
+      const left = items.filter(function (item) { return (item.x || 0) < centerX; });
+      const right = items.filter(function (item) { return (item.x || 0) >= centerX; });
+      function sortTopToBottomThenLeftToRight(a, b) {
+        const lineA = Math.round(a.y / 4);
+        const lineB = Math.round(b.y / 4);
+        if (lineA !== lineB) return lineB - lineA;
+        return a.x - b.x;
+      }
+      left.sort(sortTopToBottomThenLeftToRight);
+      right.sort(sortTopToBottomThenLeftToRight);
+      return groupItemsIntoLines(left).concat(groupItemsIntoLines(right));
+    }
+
+    document.getElementById('file').addEventListener('change', async function () {
+      const file = this.files[0];
+      const out = document.getElementById('out');
+      if (!file) { out.textContent = ''; return; }
+      out.textContent = '로딩 중...';
+      try {
+        const buf = await file.arrayBuffer();
+        const doc = await pdfjsLib.getDocument(buf).promise;
+        const max = Math.min(doc.numPages, MAX_PAGES);
+        const parts = [];
+        for (let i = 1; i <= max; i++) {
+          const page = await doc.getPage(i);
+          const content = await page.getTextContent();
+          const items = getPageTextItems(content);
+          const viewport = page.getViewport({ scale: 1 });
+          const centerX = viewport.width / 2;
+          const lines = itemsToLines(items, centerX);
+          parts.push('========== p.' + i + ' (' + lines.length + '줄) ==========\n' + lines.join('\n'));
+        }
+        out.textContent = parts.join('\n\n');
+      } catch (e) {
+        out.textContent = '오류: ' + e.message;
+      }
+    });
+    document.getElementById('copy').addEventListener('click', function () {
+      const text = document.getElementById('out').textContent;
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        this.textContent = '복사됨';
+        var btn = this;
+        setTimeout(function () { btn.textContent = '전체 복사'; }, 1500);
+      }.bind(this));
+    });
+  </script>
+</body>
+</html>

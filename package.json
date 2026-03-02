@@ -1,0 +1,11 @@
+{
+  "name": "english-listening-extract",
+  "version": "1.0.0",
+  "description": "PDF 4페이지 텍스트 추출 스크립트",
+  "scripts": {
+    "extract-4": "node scripts/extract-4pages.js"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^3.11.174"
+  }
+}

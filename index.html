@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>수능만만 듣기 스크립트 추출기 2</title>
+  <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
+  <style>
+    :root {
+      --font-light: 'NanumSquareNeoLight', sans-serif;
+      --font: 'NanumSquareNeo', sans-serif;
+      --font-bold: 'NanumSquareNeoBold', sans-serif;
+      --font-eb: 'NanumSquareNeoExtraBold', sans-serif;
+      --font-heavy: 'NanumSquareNeoHeavy', sans-serif;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card: #fff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--font);
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .main-layout {
+      display: flex;
+      gap: 0;
+      min-height: 100vh;
+      align-items: flex-start;
+      max-width: 1520px;
+      margin: 0 auto;
+    }
+    .container {
+      flex: 1;
+      max-width: 900px;
+      margin: 0;
+      padding: 2rem;
+    }
+    .page-preview-panel {
+      font-family: var(--font);
+      width: 560px;
+      min-width: 480px;
+      flex-shrink: 0;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      padding: 1rem;
+      max-height: 100vh;
+      overflow-y: auto;
+      position: sticky;
+      top: 0;
+    }
+    .page-preview-panel .panel-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-preview-panel .panel-title {
+      font-family: var(--font-bold);
+      font-size: 0.95rem;
+      color: var(--primary);
+    }
+    .preview-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      margin-bottom: 0.25rem;
+    }
+    .btn-top {
+      font-family: var(--font);
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .btn-top:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-top-floating {
+      position: fixed;
+      bottom: 24px;
+      z-index: 500;
+      font-family: var(--font);
+      font-size: 0.85rem;
+      padding: 0.45rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.12);
+      display: none;
+    }
+    .btn-top-floating.show { display: block; }
+    .btn-top-floating:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-top-floating.preview-top { left: 24px; }
+    .btn-top-floating.panel-top { right: 24px; }
+    .page-preview-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .page-preview-list .page-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+    }
+    .page-preview-list .page-row-thumb {
+      flex-shrink: 0;
+      width: 100px;
+    }
+    .page-preview-list .page-row-thumb img {
+      width: 100px;
+      height: auto;
+      max-height: 140px;
+      object-fit: contain;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .page-preview-list .page-row-thumb .page-num {
+      font-family: var(--font-bold);
+      font-size: 0.8rem;
+      color: var(--primary);
+      margin-top: 0.25rem;
+      text-align: center;
+    }
+    .page-preview-list .page-row-data {
+      flex: 1;
+      min-width: 0;
+    }
+    .page-preview-list .page-row-data pre {
+      font-family: var(--font);
+      font-size: 0.75rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      padding: 0.5rem;
+      max-height: 140px;
+      overflow-y: auto;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .page-preview-list .page-row-copy-btn {
+      margin-top: 0.35rem;
+      padding: 0.35rem 0.6rem;
+      font-size: 0.75rem;
+      font-family: var(--font);
+      color: var(--primary);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .page-preview-list .page-row-copy-btn:hover {
+      background: #e2e8f0;
+    }
+    .page-preview-list .page-row--no-thumb .page-row-data {
+      width: 100%;
+    }
+    .page-preview-list .page-row-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .page-preview-list .page-row-title-text {
+      font-family: var(--font-bold);
+      font-size: 0.95rem;
+      color: var(--primary);
+    }
+    .page-preview-list .page-row-title .page-row-copy-btn {
+      margin-top: 0;
+    }
+    .page-preview-list .page-row--no-thumb .page-row-data pre {
+      font-family: var(--font);
+      max-height: 360px;
+    }
+    .page-preview-panel.empty .page-preview-list { display: none; }
+    .page-preview-panel.empty .panel-empty {
+      display: block;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    .page-preview-panel .panel-empty { display: none; }
+    .preview-page-section {
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+      padding: 1rem;
+      margin-top: 0.5rem;
+    }
+    .preview-page-section.empty .page-preview-list { display: none; }
+    .preview-page-section.empty .panel-empty {
+      display: block;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 2rem 1rem;
+      margin: 0;
+    }
+    .preview-page-section .panel-empty { display: none; }
+    .preview-page-section:not(.empty) .page-preview-list { display: flex; }
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-family: var(--font-bold);
+      font-size: 1.5rem;
+      margin: 0;
+    }
+    .title-row .version {
+      font-family: var(--font);
+      font-size: 0.9rem;
+      color: #64748b;
+    }
+    .btn-refresh {
+      font-family: var(--font-bold);
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--card);
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .btn-refresh:hover { border-color: var(--primary); color: var(--primary); }
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+      border: 1px solid var(--border);
+    }
+    .step-label {
+      font-family: var(--font-bold);
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+    input[type="file"] {
+      font-family: var(--font);
+      padding: 0.5rem;
+    }
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      font-family: var(--font);
+      background: var(--bg);
+      transition: border-color .2s, background .2s;
+      cursor: pointer;
+      position: relative;
+      min-height: 100px;
+    }
+    .upload-zone.dragover { border-color: var(--primary); background: #eff6ff; }
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 1;
+    }
+    .upload-zone .zone-label { pointer-events: none; display: block; color: var(--primary); }
+    .upload-filenames {
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text);
+      text-align: center;
+      pointer-events: none;
+    }
+    .upload-filenames ul { margin: 0; padding: 0; list-style: none; }
+    .script-type-btns {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    .script-type-btns .btn-script {
+      font-family: var(--font-bold);
+      padding: 0.6rem 1.25rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      background: var(--card);
+      color: var(--text);
+    }
+    .script-type-btns .btn-script:hover { border-color: var(--primary); color: var(--primary); }
+    .script-type-btns .btn-script.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+    .btn {
+      font-family: var(--font-bold);
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .font-size-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .font-size-row input[type="number"] {
+      width: 80px;
+      padding: 0.5rem;
+      font-family: var(--font);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .preview-popup {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .preview-popup.show { display: flex; }
+    .preview-inner {
+      background: var(--card);
+      border-radius: 12px;
+      width: 800px;
+      max-width: 95vw;
+      max-height: 80vh;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);
+      display: flex;
+      flex-direction: column;
+    }
+    .preview-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-bold);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .preview-body {
+      padding: 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .preview-body .preview-content {
+      font-family: var(--font);
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: keep-all;
+    }
+    .preview-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text);
+      padding: 0 .25rem;
+      font-family: var(--font);
+    }
+    .download-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .status {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.9rem;
+    }
+    .status.info { background: #e0f2fe; color: #0369a1; }
+    .status.success { background: #dcfce7; color: #166534; }
+    .status.error { background: #fee2e2; color: #b91c1c; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font);
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+    }
+    th { font-family: var(--font-bold); background: var(--bg); }
+    #previewTable { font-size: inherit; }
+    #previewTableWrap { font-family: var(--font); }
+    .loading-wrap { margin-top: 1rem; display: none; }
+    .loading-wrap.show { display: block; }
+    .loading-bar {
+      height: 8px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .loading-bar-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 4px;
+      width: 0%;
+      transition: width .15s;
+    }
+    .loading-text { font-family: var(--font); font-size: 0.9rem; margin-top: 0.25rem; color: var(--text); }
+    .accordion { font-family: var(--font); }
+    .accordion-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem; overflow: hidden; }
+    .accordion-item:first-child { margin-top: 1rem; }
+    .accordion-header {
+      padding: 0.85rem 1rem;
+      cursor: pointer;
+      background: var(--bg);
+      font-family: var(--font-bold);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .accordion-header:hover { background: #f1f5f9; }
+    .accordion-header .arrow { transition: transform .2s; }
+    .accordion-item.open .accordion-header .arrow { transform: rotate(180deg); }
+    .accordion-body {
+      padding: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .25s ease-out;
+    }
+    .accordion-item.open .accordion-body { max-height: 2000px; }
+    .accordion-content {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+      white-space: pre-wrap;
+      word-break: keep-all;
+      line-height: 1.6;
+      font-size: inherit;
+    }
+    .area-disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .section-divider { margin: 1.5rem 0; border: 0; border-top: 1px solid var(--border); }
+    .one-card .step-label { margin-top: 0; }
+    .one-card .step-label:not(:first-child) { margin-top: 1rem; }
+    .preview-block { margin-bottom: 1rem; }
+    .preview-block-label { font-family: var(--font-bold); font-size: 0.85rem; color: var(--primary); margin-bottom: 0.25rem; }
+    .preview-block-content { padding: 0.5rem 0; font-family: var(--font); white-space: pre-wrap; word-break: keep-all; }
+    .preview-question-block { margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .preview-question-block:last-child { border-bottom: none; }
+    .preview-q-num { font-family: var(--font-bold); font-size: 1rem; color: var(--primary); margin-bottom: 0.5rem; }
+    .units-only-list {
+      font-family: var(--font);
+      padding: 0.75rem 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg);
+    }
+    .units-only-list .unit-chip {
+      display: inline-block;
+      margin: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    .units-only-list .unit-chip .num { font-family: var(--font-bold); color: var(--primary); margin-right: 0.25rem; }
+    .units-only-list .unit-chip .name { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="main-layout">
+  <div class="container">
+    <div class="title-row">
+      <div>
+        <h1>수능만만 듣기 스크립트 추출기 2</h1>
+        <span class="version" id="appVersion">v–</span>
+      </div>
+      <button type="button" class="btn-refresh" id="btnRefresh" title="페이지 새로고침">새로고침</button>
+    </div>
+
+    <div class="card one-card">
+      <div class="step-label">PDF 파일 업로드</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="pdfInput" accept=".pdf" />
+        <div class="zone-label">여기에 PDF를 드래그하거나 클릭하여 선택하세요</div>
+        <div class="upload-filenames" id="uploadFilenames"></div>
+      </div>
+
+      <div class="step-label">스크립트 유형 선택</div>
+      <div class="script-type-btns">
+        <button type="button" class="btn-script active" id="btnScriptKorean" data-type="korean">한국인 성우</button>
+        <button type="button" class="btn-script" id="btnScriptForeign" data-type="foreign">외국인 성우</button>
+      </div>
+
+      <hr class="section-divider" />
+
+      <button type="button" class="btn btn-primary" id="btnExtract" disabled>PDF 분석 및 스크립트 추출</button>
+      <div class="loading-wrap" id="loadingWrap">
+        <div class="loading-bar">
+          <div class="loading-bar-fill" id="loadingBarFill"></div>
+        </div>
+        <div class="loading-text" id="loadingText"></div>
+      </div>
+      <div id="extractStatus" class="status info" style="display:none;"></div>
+
+      <hr class="section-divider" />
+
+      <div id="fontDownloadArea" class="area-disabled">
+        <div class="font-size-row">
+          <label for="fontSize">폰트</label>
+          <input type="number" id="fontSize" min="10" max="30" value="15" />
+          <span>px</span>
+          <button type="button" class="btn btn-primary" id="btnPreview">미리보기</button>
+        </div>
+        <div class="download-row">
+          <button type="button" class="btn btn-primary" id="btnWord">워드(.doc)</button>
+          <button type="button" class="btn btn-primary" id="btnExcel">엑셀(.xlsx)</button>
+          <button type="button" class="btn btn-primary" id="btnText">텍스트(.txt)</button>
+        </div>
+      </div>
+
+      <hr class="section-divider" />
+
+      <div id="previewArea" class="area-disabled">
+        <div class="preview-section-header">
+          <span class="step-label" style="margin:0;">미리보기</span>
+        </div>
+        <div class="preview-page-section empty" id="previewPageSection">
+        <p class="panel-empty" id="previewPageEmpty">PDF 분석 후 추출 내용이 표시됩니다.</p>
+        <div id="previewPageList" class="page-preview-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="page-preview-panel empty" id="pagePreviewPanel">
+    <div class="panel-title-row">
+      <span class="panel-title">페이지별 추출</span>
+    </div>
+    <p class="panel-empty">PDF 분석 후 이곳에 페이지별 썸네일과 추출 내용이 표시됩니다.</p>
+    <div class="page-preview-list" id="pagePreviewList"></div>
+  </aside>
+  </div>
+
+  <button type="button" class="btn-top-floating preview-top" id="btnPreviewTopFloat" title="미리보기 최상단으로">Top</button>
+  <button type="button" class="btn-top-floating panel-top" id="btnPagePanelTopFloat" title="페이지별 추출 최상단으로">Top</button>
+
+  <div class="preview-popup" id="previewPopup">
+    <div class="preview-inner">
+      <div class="preview-header">
+        <span>미리보기 (첫 단원, 적용 폰트 크기)</span>
+        <button type="button" class="preview-close" id="previewClose" aria-label="닫기">&times;</button>
+      </div>
+      <div class="preview-body">
+        <div class="preview-content" id="previewContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
