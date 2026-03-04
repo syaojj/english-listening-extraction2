@@ -61,7 +61,7 @@
   setFontAndPreviewAreasEnabled(false);
 
   // 버전 표시: config.json 우선, 실패 시 app.js 상수 사용 (file:// 또는 경로 이슈 대비)
-  var APP_VERSION = '8.6';
+  var APP_VERSION = '8.8';
   if (appVersionEl) {
     var configUrl = (document.currentScript && document.currentScript.src)
       ? new URL('../config.json', document.currentScript.src).href

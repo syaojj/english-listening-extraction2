@@ -1,6 +1,6 @@
 {
   "appName": "녹음 스크립트 자동 생성기",
-  "version": "8.6",
+  "version": "8.8",
   "textbooks": [
     { "id": "suneungmanman", "name": "수능만만 듣기 모의고사" }
   ],
