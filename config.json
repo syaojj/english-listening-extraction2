@@ -1,11 +1,11 @@
 {
   "appName": "녹음 스크립트 자동 생성기",
-  "version": "8.5",
+  "version": "8.6",
   "textbooks": [
     { "id": "suneungmanman", "name": "수능만만 듣기 모의고사" }
   ],
   "deploy": {
-    "baseUrl": "",
+    "baseUrl": "/english-listening-extraction2/",
     "githubPages": true,
     "description": "GitHub Pages 루트 배포 시 baseUrl은 비워두고, 서브경로(예: /english-listening-extract/) 배포 시 해당 경로를 넣으세요."
   },
