@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$v = '7.5'
+$v = '8.9'
 $d = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
 $src = $PSScriptRoot
 $parent = Split-Path -Parent $src

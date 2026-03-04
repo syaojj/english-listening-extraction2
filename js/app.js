@@ -61,7 +61,7 @@
   setFontAndPreviewAreasEnabled(false);
 
   // 버전 표시: config.json 우선, 실패 시 app.js 상수 사용 (file:// 또는 경로 이슈 대비)
-  var APP_VERSION = '8.8';
+  var APP_VERSION = '9.0';
   if (appVersionEl) {
     var configUrl = (document.currentScript && document.currentScript.src)
       ? new URL('../config.json', document.currentScript.src).href
@@ -474,10 +474,12 @@
       var useUnitInTitle = filteredLines.length > 0 && isPreviewUnitNameLine(firstLine);
       var unitLabel = useUnitInTitle ? firstLine : '';
       var contentLines = useUnitInTitle ? filteredLines.slice(1) : filteredLines;
+      contentLines = filterPreviewLines(contentLines || []);
       contentLines = stripTrailingPageNumber(contentLines || []);
       contentLines = stripPreviewInstructionLines(contentLines || []);
       contentLines = mergePreviewInstructionToSingleLine(contentLines || []);
       if (scriptType === 'foreign') {
+        contentLines = stripUnitFooterSessionLines(contentLines || []);
         var proc = processForeignPreviewContent((contentLines || []).map(function (ln) { return normalizeKoreanPreviewLine(ln); }));
         contentLines = proc.contentLines || [];
       } else {
@@ -508,6 +510,7 @@
       var useUnitInTitle = filteredLines.length > 0 && isPreviewUnitNameLine(firstLine);
       var titleDisplay = useUnitInTitle ? (firstLine + ' (' + rangeStr + ')') : rangeStr;
       var contentLines = useUnitInTitle ? filteredLines.slice(1) : filteredLines;
+      contentLines = filterPreviewLines(contentLines || []);
       contentLines = stripTrailingPageNumber(contentLines || []);
       contentLines = stripPreviewInstructionLines(contentLines || []);
       contentLines = mergePreviewInstructionToSingleLine(contentLines || []);
@@ -515,6 +518,7 @@
       var text;
       var foreignProc = null;
       if (scriptType === 'foreign') {
+        contentLines = stripUnitFooterSessionLines(contentLines || []);
         foreignProc = processForeignPreviewContent(contentLines);
         contentLines = foreignProc.contentLines;
         text = (contentLines || []).join('\n');
@@ -1352,6 +1356,23 @@
       i++;
     }
     return result;
+  }
+
+  /** 외국인 스크립트 미리보기 전용: 단원 하단 ##회 문구 제거. "15"+"회", "17"+"회" (줄바꿈 분리) 또는 "15회", "17회" 단독 라인 비노출 */
+  function stripUnitFooterSessionLines(lines) {
+    if (!lines || !lines.length) return lines;
+    var out = [];
+    var i = 0;
+    while (i < lines.length) {
+      var line = (lines[i] || '').trim();
+      var nextLine = (i + 1 < lines.length) ? (lines[i + 1] || '').trim() : '';
+      if (line === '회') { i++; continue; }
+      if (/^\d+\s*회\s*$/.test(line)) { i++; continue; }
+      if (/^\d{1,2}\s*$/.test(line) && nextLine === '회') { i += 2; continue; }
+      out.push(lines[i]);
+      i++;
+    }
+    return out;
   }
 
   /** 미리보기 영역 표시용: 정답 및 해설, 안내 지시문, 페이지 하단(#회·페이지번호, indd·날짜, 수능만만 기본 영어듣기 모의고사) 제외 */
