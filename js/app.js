@@ -24,6 +24,7 @@
   const previewContent = document.getElementById('previewContent');
   const previewClose = document.getElementById('previewClose');
   const btnRefresh = document.getElementById('btnRefresh');
+  const textbookSelect = document.getElementById('textbookSelect');
 
   let extractedData = [];
   let allUnitsData = [];       // 단원별 전체 라인 (외국인/폴백)
@@ -34,6 +35,7 @@
   let previewPagesForeign = [];
   let pageToUnitLabel = {}; // 목차에서 파싱: 페이지 번호 -> '## 영어듣기 모의고사'
   let scriptType = 'korean';
+  let textbookId = 'suneungmanman';
   let uploadedFileName = '';
   /** 미리보기 기반 다운로드용: { fileName, blocks: [{ unitLabel, contentLines }] } */
   let previewExportData = null;
@@ -59,7 +61,7 @@
   setFontAndPreviewAreasEnabled(false);
 
   // 버전 표시: config.json 우선, 실패 시 app.js 상수 사용 (file:// 또는 경로 이슈 대비)
-  var APP_VERSION = '7.5';
+  var APP_VERSION = '8.5';
   if (appVersionEl) {
     var configUrl = (document.currentScript && document.currentScript.src)
       ? new URL('../config.json', document.currentScript.src).href
@@ -67,11 +69,26 @@
     fetch(configUrl)
       .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
       .then(function (data) {
-        appVersionEl.textContent = 'v' + (data.version != null ? data.version : APP_VERSION);
+        appVersionEl.textContent = '(v' + (data.version != null ? data.version : APP_VERSION) + ')';
+        if (textbookSelect && data.textbooks && Array.isArray(data.textbooks) && data.textbooks.length > 0) {
+          textbookSelect.innerHTML = '';
+          data.textbooks.forEach(function (tb) {
+            var opt = document.createElement('option');
+            opt.value = tb.id || '';
+            opt.textContent = tb.name || tb.id || '';
+            textbookSelect.appendChild(opt);
+          });
+        }
       })
       .catch(function () {
-        appVersionEl.textContent = 'v' + APP_VERSION;
+        appVersionEl.textContent = '(v' + APP_VERSION + ')';
       });
+  }
+
+  if (textbookSelect) {
+    textbookSelect.addEventListener('change', function () {
+      textbookId = textbookSelect.value || 'suneungmanman';
+    });
   }
 
   function updateUploadNames(files) {
@@ -191,9 +208,11 @@
       btnPagePanelTopFloat.classList.toggle('show', panelHasContent && panelScrolled);
     }
   }
-  if (btnPreviewTopFloat && previewPageSection) {
+  if (btnPreviewTopFloat) {
+    var pageTopEl = document.getElementById('pageTop');
     btnPreviewTopFloat.addEventListener('click', function () {
-      previewPageSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var target = pageTopEl || previewPageSection;
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
   if (btnPagePanelTopFloat && pagePreviewPanel) {
@@ -455,16 +474,22 @@
       var useUnitInTitle = filteredLines.length > 0 && isPreviewUnitNameLine(firstLine);
       var unitLabel = useUnitInTitle ? firstLine : '';
       var contentLines = useUnitInTitle ? filteredLines.slice(1) : filteredLines;
+      contentLines = stripTrailingPageNumber(contentLines || []);
       contentLines = stripPreviewInstructionLines(contentLines || []);
       contentLines = mergePreviewInstructionToSingleLine(contentLines || []);
-      contentLines = (contentLines || []).map(function (ln) { return normalizeKoreanPreviewLine(ln); });
-      if (scriptType === 'korean') contentLines = reduceKoreanPreviewToQuestionInstructionOnly(contentLines);
+      if (scriptType === 'foreign') {
+        var proc = processForeignPreviewContent((contentLines || []).map(function (ln) { return normalizeKoreanPreviewLine(ln); }));
+        contentLines = proc.contentLines || [];
+      } else {
+        contentLines = (contentLines || []).map(function (ln) { return normalizeKoreanPreviewLine(ln); });
+        if (scriptType === 'korean') contentLines = reduceKoreanPreviewToQuestionInstructionOnly(contentLines);
+      }
       out.push({ unitLabel: unitLabel, contentLines: contentLines || [] });
     });
     return out;
   }
 
-  /** 미리보기 전용: 썸네일 없이 블록별 표시. 타이틀은 '단원명 (p.페이지번호)', 단원명이 타이틀에 쓰이면 본문에서는 비노출. scriptType === 'korean'이면 문항번호+지시문 1줄만 표기. */
+  /** 미리보기 전용: 썸네일 없이 블록별 표시. 타이틀은 '단원명 (p.페이지번호)', 단원명이 타이틀에 쓰이면 본문에서는 비노출. scriptType === 'korean'이면 문항번호+지시문 1줄만, foreign이면 W:/M: 색상·문항번호 볼드 적용. */
   function fillPreviewPagesNoThumb(container, pagesOrBlocks, scriptType) {
     if (!container) return;
     container.innerHTML = '';
@@ -483,11 +508,20 @@
       var useUnitInTitle = filteredLines.length > 0 && isPreviewUnitNameLine(firstLine);
       var titleDisplay = useUnitInTitle ? (firstLine + ' (' + rangeStr + ')') : rangeStr;
       var contentLines = useUnitInTitle ? filteredLines.slice(1) : filteredLines;
+      contentLines = stripTrailingPageNumber(contentLines || []);
       contentLines = stripPreviewInstructionLines(contentLines || []);
       contentLines = mergePreviewInstructionToSingleLine(contentLines || []);
       contentLines = (contentLines || []).map(function (ln) { return normalizeKoreanPreviewLine(ln); });
-      if (scriptType === 'korean') contentLines = reduceKoreanPreviewToQuestionInstructionOnly(contentLines);
-      var text = (contentLines || []).join('\n');
+      var text;
+      var foreignProc = null;
+      if (scriptType === 'foreign') {
+        foreignProc = processForeignPreviewContent(contentLines);
+        contentLines = foreignProc.contentLines;
+        text = (contentLines || []).join('\n');
+      } else {
+        if (scriptType === 'korean') contentLines = reduceKoreanPreviewToQuestionInstructionOnly(contentLines);
+        text = (contentLines || []).join('\n');
+      }
       var row = document.createElement('div');
       row.className = 'page-row page-row--no-thumb';
       var data = document.createElement('div');
@@ -514,9 +548,28 @@
       titleRow.appendChild(titleText);
       titleRow.appendChild(copyBtn);
       data.appendChild(titleRow);
-      var pre = document.createElement('pre');
-      pre.textContent = text;
-      data.appendChild(pre);
+      if (scriptType === 'foreign' && foreignProc) {
+        var contentDiv = document.createElement('div');
+        contentDiv.className = 'page-row-foreign-content';
+        contentDiv.style.whiteSpace = 'pre-wrap';
+        contentDiv.style.wordBreak = 'break-word';
+        contentDiv.style.lineHeight = '1.45';
+        contentDiv.style.margin = '0';
+        contentDiv.style.padding = '0.5rem';
+        contentDiv.style.maxHeight = '360px';
+        contentDiv.style.overflowY = 'auto';
+        contentDiv.style.background = '#fff';
+        contentDiv.style.borderRadius = '6px';
+        contentDiv.style.border = '1px solid ' + (getComputedStyle ? getComputedStyle(document.body).getPropertyValue('--border') || '#e2e8f0' : '#e2e8f0');
+        contentDiv.style.fontSize = '0.75rem';
+        contentDiv.style.fontFamily = 'var(--font), NanumSquareNeo, sans-serif';
+        contentDiv.innerHTML = foreignProc.displayHtml;
+        data.appendChild(contentDiv);
+      } else {
+        var pre = document.createElement('pre');
+        pre.textContent = text;
+        data.appendChild(pre);
+      }
       row.appendChild(data);
       container.appendChild(row);
     });
@@ -653,6 +706,20 @@
     return lines.filter(function (line) { return !skipRe.test((line || '').trim()); });
   }
 
+  /** 미리보기 전용: 마지막에 있는 페이지 번호 제거 (단독 숫자 줄, 마지막 줄 끝 숫자) */
+  function stripTrailingPageNumber(lines) {
+    if (!lines || !lines.length) return lines;
+    var out = lines.slice();
+    while (out.length > 0 && /^\s*\d{1,3}\s*$/.test((out[out.length - 1] || '').trim())) {
+      out.pop();
+    }
+    if (out.length > 0) {
+      var last = (out[out.length - 1] || '').replace(/\s+\d{1,3}\s*$/, '');
+      if (last !== out[out.length - 1]) out[out.length - 1] = last.trim();
+    }
+    return out;
+  }
+
   /** 미리보기 전용: 지시문 2줄 이상을 1줄로 합치고, 끝의 'N 회' 제거, 공백 정리 */
   function mergePreviewInstructionToSingleLine(lines) {
     if (!lines || !lines.length) return lines;
@@ -670,7 +737,7 @@
       var j = i + 1;
       while (j < lines.length) {
         var nextLine = (lines[j] || '').trim();
-        if (/^\d{1,2}\s*$/.test(nextLine)) break;
+        if (/^\d{1,2}\s*$/.test(nextLine) || /^\d{1,2}\s*[~\-–−]\s*\d{1,2}\s*$/.test(nextLine)) break;
         if (!nextLine) { j++; continue; }
         merged = (merged + ' ' + nextLine).replace(/\s{2,}/g, ' ').trim();
         merged = merged.replace(/\s*\d+\s*회\s*$/g, '').replace(/\s+\d+\s*회\s*/g, ' ').trim();
@@ -690,6 +757,191 @@
     var t = String(line).replace(/\s{2,}/g, ' ').trim();
     t = t.replace(/고\s*르\s*시\s*오\s*\.?/g, '고르시오.');
     return t;
+  }
+
+  /** 외국인 성우: 문항번호 라인인지 (01, 02, 16~17, 16-17 등, en-dash 포함) */
+  function isForeignQuestionNumberLine(line) {
+    if (!line || typeof line !== 'string') return false;
+    var t = line.trim();
+    if (/^\d{1,2}\s*$/.test(t)) return true;
+    if (/^\d{1,2}\s*[~\-–−]\s*\d{1,2}\s*$/.test(t)) return true;
+    return false;
+  }
+
+  /** 외국인 성우: 02번부터 또는 16~17/16-17 이면 앞줄 띄기 필요 */
+  function needsBlankBeforeQuestionNum(line) {
+    if (!line || typeof line !== 'string') return false;
+    var t = line.trim();
+    if (/^01\s*$/.test(t)) return false;
+    if (/^\d{1,2}\s*$/.test(t)) return true;
+    if (/^\d{1,2}\s*[~\-–−]\s*\d{1,2}\s*$/.test(t)) return true;
+    return false;
+  }
+
+  /** 외국인 성우: 라인에서 문항번호+대화 분리 (예: "16~17 M: Welcome..." → ["16~17", "M: Welcome..."]) */
+  function splitQuestionNumAndDialogue(line) {
+    var t = (line || '').trim();
+    if (!t) return null;
+    var m = t.match(/^(\d{1,2}\s*[~\-–−]\s*\d{1,2}|\d{1,2})\s+([WM]:\s*.+)$/);
+    if (m) return [m[1].trim(), m[2].trim()];
+    return [t];
+  }
+
+  /** 외국인 성우: 라인 끝의 16-17, 16~17 분리 (예: "Frances: (...) 16-17" → ["Frances: (...)", "16-17"], 공백 없이 붙어도 분리) */
+  function splitTrailingQuestionNum(line) {
+    var t = (line || '').trim();
+    if (!t) return [t];
+    var m = t.match(/^(.+?)\s*(16\s*[~\-–−]\s*17)\s*$/);
+    if (m) return [m[1].trim(), m[2].trim()];
+    return [t];
+  }
+
+  /** 외국인 성우: 발화자 태그로 시작하는지 (M:, W:, 영어이름:) */
+  function startsWithSpeakerTag(text) {
+    if (!text || typeof text !== 'string') return null;
+    var t = text.trim();
+    var m = t.match(/^(M|W)\s*:\s*(.*)$/);
+    if (m) return m[1].toLowerCase();
+    var n = t.match(/^([A-Z][a-z]+)\s*:\s*(.*)$/);
+    if (n && n[1] !== 'M' && n[1] !== 'W') return 'other';
+    return null;
+  }
+
+  /** 외국인 성우: M:, W:, 영어이름: 기준으로 텍스트를 블록 배열로 분리 [{ speaker, text }] */
+  function splitBySpeakerBlocks(text) {
+    if (!text || typeof text !== 'string') return [];
+    var t = text.replace(/\s{2,}/g, ' ').trim();
+    if (!t) return [];
+    var re = /(?=(?:M|W)\s*:\s*|\b(?:[A-Z][a-z]+)\s*:\s*)/g;
+    var parts = t.split(re).map(function (p) { return p.trim(); }).filter(Boolean);
+    var result = [];
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      var sp = startsWithSpeakerTag(p);
+      if (sp) result.push({ speaker: sp, text: p });
+      else if (result.length) result[result.length - 1].text += (result[result.length - 1].text ? ' ' : '') + p;
+      else result.push({ speaker: 'other', text: p });
+    }
+    return result;
+  }
+
+  /** 외국인 성우 미리보기: M:/W:/영어이름: 나오기 전까지 같은 색상 블록, 16-17/16~17 앞 한줄띄기 */
+  function processForeignPreviewContent(lines) {
+    var contentLines = [];
+    var displayParts = [];
+    var COLOR_M = '#1565c0';
+    var COLOR_W = '#c2185b';
+    var COLOR_OTHER = '#2e7d32';
+    var tokens = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = (lines[i] || '').trim();
+      if (!line) continue;
+      var trailingParts = splitTrailingQuestionNum(line);
+      var rest = trailingParts[0];
+      var trailing = trailingParts[1];
+      if (trailing && rest !== line) {
+        if (isForeignQuestionNumberLine(rest)) tokens.push({ type: 'qnum', text: rest });
+        else tokens.push({ type: 'text', text: rest });
+        tokens.push({ type: 'qnum', text: trailing });
+        continue;
+      }
+      var segs = splitQuestionNumAndDialogue(line);
+      for (var s = 0; s < segs.length; s++) {
+        var seg = segs[s];
+        if (isForeignQuestionNumberLine(seg)) {
+          tokens.push({ type: 'qnum', text: seg });
+        } else {
+          tokens.push({ type: 'text', text: seg });
+        }
+      }
+    }
+    var blockBuf = '';
+    var blockSpeaker = null;
+    for (var t = 0; t < tokens.length; t++) {
+      var tok = tokens[t];
+      if (tok.type === 'qnum') {
+        if (blockBuf && blockSpeaker) {
+          contentLines.push(blockBuf.trim());
+          displayParts.push({ type: blockSpeaker, text: blockBuf.trim() });
+          blockBuf = '';
+          blockSpeaker = null;
+        }
+        if (needsBlankBeforeQuestionNum(tok.text) && contentLines.length > 0) {
+          contentLines.push('');
+          displayParts.push('');
+        }
+        contentLines.push(tok.text);
+        displayParts.push({ type: 'qnum', text: tok.text });
+      } else {
+        if (startsWithSpeakerTag(tok.text)) {
+          var blocks = splitBySpeakerBlocks(tok.text);
+          for (var b = 0; b < blocks.length; b++) {
+            var blk = blocks[b];
+            if (blockBuf && blockSpeaker && blockSpeaker !== blk.speaker) {
+              contentLines.push(blockBuf.trim());
+              displayParts.push({ type: blockSpeaker, text: blockBuf.trim() });
+              blockBuf = '';
+            }
+            if (blockSpeaker === blk.speaker && blockBuf) {
+              blockBuf += ' ' + blk.text.replace(/\s{2,}/g, ' ').trim();
+            } else {
+              if (blockBuf && blockSpeaker) {
+                contentLines.push(blockBuf.trim());
+                displayParts.push({ type: blockSpeaker, text: blockBuf.trim() });
+              }
+              blockBuf = blk.text;
+              blockSpeaker = blk.speaker;
+            }
+          }
+        } else {
+          if (blockBuf) blockBuf += ' ' + tok.text.replace(/\s{2,}/g, ' ').trim();
+          else { blockBuf = tok.text; if (!blockSpeaker) blockSpeaker = 'other'; }
+        }
+      }
+    }
+    if (blockBuf && blockSpeaker) {
+      contentLines.push(blockBuf.trim());
+      displayParts.push({ type: blockSpeaker, text: blockBuf.trim() });
+    }
+    var collapsedLines = [];
+    var collapsedParts = [];
+    for (var k = 0; k < contentLines.length; k++) {
+      if (contentLines[k] === '') {
+        if (collapsedLines[collapsedLines.length - 1] === '') continue;
+      }
+      collapsedLines.push(contentLines[k]);
+      collapsedParts.push(displayParts[k]);
+    }
+    contentLines = collapsedLines;
+    displayParts = collapsedParts;
+    /* 16~17/16-17 앞에 빈 줄 보장 (이중 안전장치) */
+    var finalLines = [];
+    var finalParts = [];
+    for (var idx = 0; idx < contentLines.length; idx++) {
+      var ln = contentLines[idx];
+      if (/^\d{1,2}\s*[~\-–−]\s*\d{1,2}\s*$/.test((ln || '').trim())) {
+        if (finalLines.length > 0 && finalLines[finalLines.length - 1] !== '') {
+          finalLines.push('');
+          finalParts.push('');
+        }
+      }
+      finalLines.push(ln);
+      finalParts.push(displayParts[idx]);
+    }
+    contentLines = finalLines;
+    displayParts = finalParts;
+    var displayHtml = displayParts.map(function (p) {
+      if (p === '') return '<br>';
+      if (typeof p === 'object') {
+        if (p.type === 'qnum') return '<span class="foreign-qnum" style="font-weight:bold">' + escapeHtml(p.text) + '</span>';
+        if (p.type === 'm') return '<span class="foreign-m" style="color:' + COLOR_M + '">' + escapeHtml(p.text) + '</span>';
+        if (p.type === 'w') return '<span class="foreign-w" style="color:' + COLOR_W + '">' + escapeHtml(p.text) + '</span>';
+        if (p.type === 'other') return '<span class="foreign-other" style="color:' + COLOR_OTHER + '">' + escapeHtml(p.text) + '</span>';
+        return '<span>' + escapeHtml(p.text) + '</span>';
+      }
+      return '<span>' + escapeHtml(p) + '</span>';
+    }).join('<br>');
+    return { contentLines: contentLines, displayHtml: displayHtml };
   }
 
   /** 지시문 끝 위치: 마침표(.)·물음표(?) 중 첫 번째. 단 '알파벳+마침표'(Mrs., Mr., Dr. 등)는 제외 */
@@ -1725,7 +1977,7 @@
         : parsePagesForForeign(allPageLines);
 
       setLoading(false);
-      setStatus('추출 완료. 단원 ' + allUnitsData.length + '개 추출.', 'success');
+      setStatus('추출 완료', 'success');
       setFontAndPreviewAreasEnabled(true);
       renderUnitsOnly();
       renderAccordion();
@@ -1971,7 +2223,7 @@
     return { html: lines.join('\n\n'), fontSize: fontSize };
   }
 
-  /** 폰트 미리보기 팝업: 파일명(+5px 볼드), 한줄띄기, 단원1만 단원명(+2px 볼드), 문제번호+지시문(기본폰트) */
+  /** 폰트 미리보기 팝업: 파일명(+5px 볼드), 한줄띄기, 단원1만 단원명(+2px 볼드). korean=문제번호+지시문, foreign=M/W 색상·문항번호 볼드 */
   function buildFontPreviewHtml() {
     var fontSize = getFontSize();
     var f5 = fontSize + 5;
@@ -1985,9 +2237,28 @@
       parts.push('<p style="font-size:' + f5 + 'px;font-weight:bold;margin:0 0 .5em 0">' + escapeHtml(fileName) + '</p>');
       parts.push('<p style="margin:0 0 .5em 0"><br></p>');
       if (unitLabel) parts.push('<p style="font-size:' + f2 + 'px;font-weight:bold;margin:0 0 .5em 0">' + escapeHtml(unitLabel) + '</p>');
-      contentLines.forEach(function (ln) {
-        parts.push('<p style="font-size:' + fontSize + 'px;margin:0 0 .35em 0">' + escapeHtml(ln) + '</p>');
-      });
+      if (scriptType === 'foreign') {
+        var COLOR_M = '#1565c0';
+        var COLOR_W = '#c2185b';
+        var COLOR_OTHER = '#2e7d32';
+        contentLines.forEach(function (ln) {
+          if (ln === '') {
+            parts.push('<p style="margin:0 0 .35em 0"><br></p>');
+          } else if (isForeignQuestionNumberLine(ln)) {
+            parts.push('<p style="font-size:' + fontSize + 'px;font-weight:bold;margin:0 0 .35em 0">' + escapeHtml(ln) + '</p>');
+          } else if (/^M:\s/.test(ln)) {
+            parts.push('<p style="font-size:' + fontSize + 'px;margin:0 0 .35em 0;color:' + COLOR_M + '">' + escapeHtml(ln) + '</p>');
+          } else if (/^W:\s/.test(ln)) {
+            parts.push('<p style="font-size:' + fontSize + 'px;margin:0 0 .35em 0;color:' + COLOR_W + '">' + escapeHtml(ln) + '</p>');
+          } else {
+            parts.push('<p style="font-size:' + fontSize + 'px;margin:0 0 .35em 0;color:' + COLOR_OTHER + '">' + escapeHtml(ln) + '</p>');
+          }
+        });
+      } else {
+        contentLines.forEach(function (ln) {
+          parts.push('<p style="font-size:' + fontSize + 'px;margin:0 0 .35em 0">' + escapeHtml(ln) + '</p>');
+        });
+      }
       return parts.join('');
     }
     var first = getFirstUnitPreview();
@@ -2104,10 +2375,21 @@
         var f5 = fontSize + 5;
         var f2 = fontSize + 2;
         var bodyParts = ['<p style="font-size:' + f5 + 'px;font-weight:bold">' + escapeHtml(fileName) + '</p>', '<p><br></p>'];
+        var COLOR_M = '#1565c0';
+        var COLOR_W = '#c2185b';
+        var COLOR_OTHER = '#2e7d32';
         blocks.forEach(function (b) {
           if (b.unitLabel) bodyParts.push('<p style="font-size:' + f2 + 'px;font-weight:bold">' + escapeHtml(b.unitLabel) + '</p>');
           (b.contentLines || []).forEach(function (ln) {
-            bodyParts.push('<p style="font-size:' + fontSize + 'px">' + escapeHtml(ln) + '</p>');
+            if (scriptType === 'foreign') {
+              if (ln === '') bodyParts.push('<p><br></p>');
+              else if (isForeignQuestionNumberLine(ln)) bodyParts.push('<p style="font-size:' + fontSize + 'px;font-weight:bold">' + escapeHtml(ln) + '</p>');
+              else if (/^M:\s/.test(ln)) bodyParts.push('<p style="font-size:' + fontSize + 'px;color:' + COLOR_M + '">' + escapeHtml(ln) + '</p>');
+              else if (/^W:\s/.test(ln)) bodyParts.push('<p style="font-size:' + fontSize + 'px;color:' + COLOR_W + '">' + escapeHtml(ln) + '</p>');
+              else bodyParts.push('<p style="font-size:' + fontSize + 'px;color:' + COLOR_OTHER + '">' + escapeHtml(ln) + '</p>');
+            } else {
+              bodyParts.push('<p style="font-size:' + fontSize + 'px">' + escapeHtml(ln) + '</p>');
+            }
           });
           bodyParts.push('<p><br></p>');
         });

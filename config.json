@@ -1,6 +1,9 @@
 {
-  "appName": "수능만만 듣기 스크립트 추출기 2",
-  "version": "7.5",
+  "appName": "녹음 스크립트 자동 생성기",
+  "version": "8.5",
+  "textbooks": [
+    { "id": "suneungmanman", "name": "수능만만 듣기 모의고사" }
+  ],
   "deploy": {
     "baseUrl": "",
     "githubPages": true,
